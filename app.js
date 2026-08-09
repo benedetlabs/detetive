@@ -10,7 +10,6 @@ import {
 
 const STORAGE_KEY = 'detetive_estrela_app_state_v1';
 
-// Estado Principal da Aplicação
 let state = {
   presetKey: 'classico',
   preset: GAME_PRESETS.classico,
@@ -21,11 +20,10 @@ let state = {
 
 let activeCellTarget = null; // { cardName, colIdx }
 
-// Register Service Worker for Offline PWA support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(err => {
-      console.log('ServiceWorker registration failed: ', err);
+      console.log('ServiceWorker error: ', err);
     });
   });
 }
@@ -73,7 +71,6 @@ function resetState(presetKey, playersList) {
 }
 
 function initUI() {
-  // Navegação de Abas
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const tabId = e.currentTarget.getAttribute('data-tab');
@@ -86,7 +83,6 @@ function initUI() {
     });
   });
 
-  // Botões principais
   document.getElementById('btnMyHand').addEventListener('click', openMyHandModal);
   document.getElementById('btnNewGame').addEventListener('click', openNewGameModal);
   document.getElementById('btnClearSheet').addEventListener('click', () => {
@@ -96,12 +92,10 @@ function initUI() {
     }
   });
 
-  // Filtro de Busca de Cartas
   document.getElementById('inputCardFilter').addEventListener('input', (e) => {
     renderGridTable(e.target.value.trim().toLowerCase());
   });
 
-  // Fechamento de Modais
   document.querySelectorAll('[data-close]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const modalId = e.currentTarget.getAttribute('data-close');
@@ -109,7 +103,6 @@ function initUI() {
     });
   });
 
-  // Picker de Status Rápido para Celulares
   document.querySelectorAll('.picker-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const val = parseInt(e.currentTarget.getAttribute('data-val'), 10);
@@ -137,17 +130,22 @@ function renderAll() {
   applyAutoInferences(state);
   saveState();
 
-  renderGridTable();
-  renderDeductions();
+  const deductions = calculateDeductions(state);
+  renderGridTable("", deductions);
+  renderDeductions(deductions);
   renderHistory();
   populateDropdowns();
 }
 
 /* ==========================================================================
-   RENDERIZAÇÃO DA TABELA
+   RENDERIZAÇÃO DA TABELA COM BADGES DE PORCENTAGEM
    ========================================================================== */
 
-function renderGridTable(filterText = "") {
+function renderGridTable(filterText = "", deductions = null) {
+  if (!deductions) {
+    deductions = calculateDeductions(state);
+  }
+
   const headerRow = document.getElementById('tableHeaderRow');
   const tbody = document.getElementById('tableBody');
 
@@ -180,9 +178,24 @@ function renderGridTable(filterText = "") {
         state.grid[cardName] = Array(state.players.length + 1).fill(STATUS_UNKNOWN);
       }
       const rowStatus = state.grid[cardName];
+      const cardInfo = deductions.cardStatusInfo[cardName] || { chancePct: 0, isSolved: false, isEliminated: false };
+
+      let badgeHtml = "";
+      if (cardInfo.isSolved) {
+        badgeHtml = `<span class="prob-badge solved">🎯 100%</span>`;
+      } else if (cardInfo.chancePct > 0) {
+        badgeHtml = `<span class="prob-badge candidate">${cardInfo.chancePct}%</span>`;
+      } else {
+        badgeHtml = `<span class="prob-badge zero">0%</span>`;
+      }
 
       html += `<tr>`;
-      html += `<td class="cell-card-name">${escapeHtml(cardName)}</td>`;
+      html += `
+        <td class="cell-card-name">
+          <span>${escapeHtml(cardName)}</span>
+          ${badgeHtml}
+        </td>
+      `;
 
       for (let colIdx = 0; colIdx <= state.players.length; colIdx++) {
         const status = rowStatus[colIdx] || STATUS_UNKNOWN;
@@ -206,14 +219,12 @@ function renderGridTable(filterText = "") {
 
   tbody.innerHTML = html;
 
-  // Interatividade nas Células (Toque inteligente para Celulares)
   tbody.querySelectorAll('.cell-mark').forEach(cell => {
     cell.addEventListener('click', (e) => {
       const cardName = e.currentTarget.getAttribute('data-card');
       const colIdx = parseInt(e.currentTarget.getAttribute('data-col'), 10);
       let currentStatus = parseInt(e.currentTarget.getAttribute('data-status'), 10);
 
-      // Em telas menores (celular), abre o Seletor Rápido em popup/modal para escolha direta com 1 toque
       if (window.innerWidth <= 768) {
         activeCellTarget = { cardName, colIdx };
         const playerName = colIdx === state.players.length ? "Envelope 🔍" : state.players[colIdx];
@@ -221,7 +232,6 @@ function renderGridTable(filterText = "") {
         document.getElementById('pickerSubtitle').textContent = `Marcar status para: ${playerName}`;
         document.getElementById('modalStatusPicker').classList.add('active');
       } else {
-        // No Desktop, alterna em ciclo rápido: 0 (?) -> 1 (❌) -> 2 (✔) -> 3 (🔍) -> 0 (?)
         let nextStatus = (currentStatus + 1) % 4;
         state.grid[cardName][colIdx] = nextStatus;
         renderAll();
@@ -240,16 +250,18 @@ function getStatusIcon(status) {
 }
 
 /* ==========================================================================
-   PAINEL DE DEDUÇÃO E PROBABILIDADES
+   PAINEL DEDICADO DE PROBABILIDADES E BARRAS DE PROGRESSO (%)
    ========================================================================== */
 
-function renderDeductions() {
-  const deductions = calculateDeductions(state);
+function renderDeductions(deductions = null) {
+  if (!deductions) {
+    deductions = calculateDeductions(state);
+  }
 
   const categories = [
-    { key: 'suspects', label: 'Suspeito', icon: '👤', candEl: 'candidatesSuspect', probEl: 'probSuspect' },
-    { key: 'weapons', label: 'Arma', icon: '🔪', candEl: 'candidatesWeapon', probEl: 'probWeapon' },
-    { key: 'locations', label: 'Local', icon: '🏰', candEl: 'candidatesLocation', probEl: 'probLocation' }
+    { key: 'suspects', label: 'Suspeito', icon: '👤', candEl: 'candidatesSuspect', probEl: 'probSuspect', items: state.preset.suspects },
+    { key: 'weapons', label: 'Arma', icon: '🔪', candEl: 'candidatesWeapon', probEl: 'probWeapon', items: state.preset.weapons },
+    { key: 'locations', label: 'Local', icon: '🏰', candEl: 'candidatesLocation', probEl: 'probLocation', items: state.preset.locations }
   ];
 
   let totalCombinations = 1;
@@ -279,20 +291,54 @@ function renderDeductions() {
     badgePossibilities.textContent = `${totalCombinations}`;
   }
 
+  // Renderizar Barras de Progresso Detalhadas de Probabilidade por Carta na Aba Crime
   const detailedView = document.getElementById('detailedDeductionView');
   if (detailedView) {
     let html = "";
     categories.forEach(cat => {
-      const data = deductions[cat.key];
       html += `
-        <div style="background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem;">
-          <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-gold); margin-bottom: 0.4rem;">
-            ${cat.icon} ${cat.label}: ${data.solved ? `<span style="color: var(--accent-green);">🎯 ${escapeHtml(data.solved)}</span>` : `${data.remaining.length} Possibilidades`}
+        <div style="background: var(--bg-dark); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem; margin-bottom: 0.5rem;">
+          <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-gold); margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+            <span>${cat.icon} ${cat.label}s</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">
+              ${deductions[cat.key].solved ? '🎯 Solucionado' : `${deductions[cat.key].remaining.length} candidatos`}
+            </span>
           </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
-            ${data.remaining.map(c => `
-              <span class="tag ${c === data.solved ? 'resolved' : 'probable'}">${escapeHtml(c)}</span>
-            `).join('')}
+          
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+      `;
+
+      cat.items.forEach(cardName => {
+        const info = deductions.cardStatusInfo[cardName] || { chancePct: 0, statusText: '', isSolved: false, isEliminated: false };
+        const pct = info.chancePct;
+
+        let fillClass = "fill-zero";
+        let pctClass = "pct-zero";
+        if (info.isSolved) {
+          fillClass = "fill-solved";
+          pctClass = "pct-100";
+        } else if (pct > 0) {
+          fillClass = "fill-cand";
+          pctClass = "pct-cand";
+        }
+
+        html += `
+          <div class="prob-card-row ${info.isSolved ? 'solved-row' : ''}">
+            <div class="prob-row-header">
+              <span class="card-title">${escapeHtml(cardName)}</span>
+              <span class="card-pct ${pctClass}">${pct}%</span>
+            </div>
+            <div class="prob-bar-container">
+              <div class="prob-bar-fill ${fillClass}" style="width: ${pct}%;"></div>
+            </div>
+            <div class="prob-row-footer">
+              <span>${escapeHtml(info.statusText)}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
           </div>
         </div>
       `;
@@ -355,7 +401,7 @@ function saveInitialHand() {
 }
 
 /* ==========================================================================
-   NOVA PARTIDA E CONFIGURAÇÕES
+   NOVA PARTIDA
    ========================================================================== */
 
 function openNewGameModal() {

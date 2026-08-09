@@ -21,17 +21,16 @@ export function calculateDeductions(state) {
   ];
 
   const results = {
-    suspects: { remaining: [], solved: null, total: preset.suspects.length },
-    weapons: { remaining: [], solved: null, total: preset.weapons.length },
-    locations: { remaining: [], solved: null, total: preset.locations.length },
-    autoInferencesMade: []
+    suspects: { remaining: [], solved: null, total: preset.suspects.length, probabilities: {} },
+    weapons: { remaining: [], solved: null, total: preset.weapons.length, probabilities: {} },
+    locations: { remaining: [], solved: null, total: preset.locations.length, probabilities: {} },
+    cardStatusInfo: {} // { [cardName]: { chancePct, statusText, isSolved, isEliminated } }
   };
 
   categories.forEach(cat => {
     cat.items.forEach(cardName => {
       const cardRow = grid[cardName] || Array(players.length + 1).fill(STATUS_UNKNOWN);
 
-      // Verificar se algum jogador possui esta carta
       let holderPlayerIndex = -1;
       let allPlayersNotHas = true;
 
@@ -46,7 +45,7 @@ export function calculateDeductions(state) {
 
       const envelopeStatus = cardRow[envelopeColIndex];
 
-      // Se a carta foi explicitamente marcada no envelope OU se TODOS os jogadores não a têm
+      // Se a carta foi confirmada no envelope OU se TODOS os jogadores não a têm
       if (envelopeStatus === STATUS_ENVELOPE || (allPlayersNotHas && envelopeStatus !== STATUS_NOT_HAS)) {
         results[cat.key].solved = cardName;
         results[cat.key].remaining = [cardName];
@@ -57,10 +56,52 @@ export function calculateDeductions(state) {
       }
     });
 
-    // Se sobrou apenas 1 candidato possível, ele é a solução!
+    // Se sobrou apenas 1 candidato possível na categoria, ele é a solução!
     if (results[cat.key].remaining.length === 1) {
       results[cat.key].solved = results[cat.key].remaining[0];
     }
+
+    // Calcular porcentagens individuais para cada carta da categoria
+    const remainingCount = results[cat.key].remaining.length;
+    const isCategorySolved = !!results[cat.key].solved;
+
+    cat.items.forEach(cardName => {
+      const cardRow = grid[cardName] || Array(players.length + 1).fill(STATUS_UNKNOWN);
+      let holderPlayerIndex = cardRow.findIndex((st, idx) => idx < players.length && st === STATUS_HAS);
+
+      let pct = 0;
+      let statusText = "";
+      let isSolved = false;
+      let isEliminated = false;
+
+      if (results[cat.key].solved === cardName) {
+        pct = 100;
+        statusText = "🎯 Solução Confirmada";
+        isSolved = true;
+      } else if (holderPlayerIndex !== -1) {
+        pct = 0;
+        statusText = `Eliminada (${players[holderPlayerIndex]} possui)`;
+        isEliminated = true;
+      } else if (cardRow[envelopeColIndex] === STATUS_NOT_HAS) {
+        pct = 0;
+        statusText = "Eliminada do Envelope";
+        isEliminated = true;
+      } else if (isCategorySolved) {
+        pct = 0;
+        statusText = "Eliminada (Outro item solucionado)";
+        isEliminated = true;
+      } else if (results[cat.key].remaining.includes(cardName)) {
+        pct = Math.round(100 / remainingCount);
+        statusText = `Candidato (${pct}% chance)`;
+      } else {
+        pct = 0;
+        statusText = "Eliminada";
+        isEliminated = true;
+      }
+
+      results[cat.key].probabilities[cardName] = pct;
+      results.cardStatusInfo[cardName] = { chancePct: pct, statusText, isSolved, isEliminated };
+    });
   });
 
   return results;
@@ -68,7 +109,6 @@ export function calculateDeductions(state) {
 
 /**
  * Propaga auto-deduções lógicas pela grade
- * Exemplo: Se Jogador 1 tem a carta X, nenhum outro jogador pode tê-la e ela não pode estar no envelope.
  */
 export function applyAutoInferences(state) {
   const { preset, players, grid } = state;
