@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Detetive Estrela - Cartão de Anotações & Dedução</title>
+  <meta name="description" content="Aplicativo gratuito para celular para auxiliar na investigação do jogo de tabuleiro Detetive da Estrela. Anotações interativas e cálculo de probabilidades.">
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/000000/detective-emoji.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon">🕵️‍♂️</span>
+        <div>
+          <h1 class="brand-title">Detetive Estrela</h1>
+          <div class="brand-subtitle">Assistente de Investigação</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btnMyHand" class="btn btn-primary btn-sm">
+          <span>🃏</span> Mão Inicial
+        </button>
+        <button id="btnNewGame" class="btn btn-secondary btn-sm">
+          <span>🔄</span> Novo Jogo
+        </button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation (Navegação de Rodapé no Celular) -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-sheet">
+        <span>📋</span> <span>Cartão</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-deduction">
+        <span>🧠</span> <span>Crime</span> <span id="badgePossibilities" class="badge">?</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-history">
+        <span>📜</span> <span>Histórico</span>
+      </button>
+    </nav>
+
+    <!-- TAB 1: Cartão de Anotação (Grid Table) -->
+    <section id="tab-sheet" class="tab-content active">
+      
+      <!-- Live Solution Banner -->
+      <div class="mystery-banner">
+        <div class="solution-card">
+          <div class="solution-header">
+            <span class="solution-type">👤 Suspeito</span>
+            <span id="probSuspect" class="solution-value">Calculando...</span>
+          </div>
+          <div id="candidatesSuspect" class="solution-candidates"></div>
+        </div>
+
+        <div class="solution-card">
+          <div class="solution-header">
+            <span class="solution-type">🔪 Arma</span>
+            <span id="probWeapon" class="solution-value">Calculando...</span>
+          </div>
+          <div id="candidatesWeapon" class="solution-candidates"></div>
+        </div>
+
+        <div class="solution-card">
+          <div class="solution-header">
+            <span class="solution-type">🏰 Local</span>
+            <span id="probLocation" class="solution-value">Calculando...</span>
+          </div>
+          <div id="candidatesLocation" class="solution-candidates"></div>
+        </div>
+      </div>
+
+      <!-- Table Controls -->
+      <div class="card-sheet">
+        <div class="table-controls">
+          <div class="quick-legend">
+            <div class="legend-item"><span class="legend-icon icon-unknown">?</span> Desconhecido</div>
+            <div class="legend-item"><span class="legend-icon icon-not-has">❌</span> Não tem</div>
+            <div class="legend-item"><span class="legend-icon icon-has">✔</span> Tem</div>
+            <div class="legend-item"><span class="legend-icon icon-suspect">🔍</span> Envelope</div>
+          </div>
+          
+          <div style="display: flex; gap: 0.4rem; align-items: center; width: 100%; max-width: 320px;">
+            <input type="text" id="inputCardFilter" class="form-control" placeholder="🔍 Buscar carta..." style="min-height: 38px; padding: 0.35rem 0.65rem;">
+            <button id="btnClearSheet" class="btn btn-danger btn-sm" style="white-space: nowrap;">Limpar</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Grid Table -->
+        <div class="table-wrapper">
+          <table class="grid-table" id="gridTable">
+            <thead>
+              <tr id="tableHeaderRow">
+                <th class="col-card-name">Cartas do Crime</th>
+                <!-- Dinamicamente gerado: Jogadores + Envelope -->
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Dinamicamente gerado via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- TAB 2: Deduções & Análise Detalhada -->
+    <section id="tab-deduction" class="tab-content">
+      <div class="grid-2col">
+        
+        <div class="panel">
+          <h3 class="panel-title"><span>🔍</span> Análise do Envelope Misterioso</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+            O sistema calcula os itens do Envelope baseando-se nas cartas descartadas.
+          </p>
+
+          <div id="detailedDeductionView" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Conteúdo dinâmico -->
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title"><span>⚡</span> Assistente de Palpites</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+            Insira os palpites feitos na mesa para deduzir cartas ocultas automaticamente.
+          </p>
+
+          <form id="formSuggestion">
+            <div class="form-group">
+              <label for="selectAsker">Quem perguntou?</label>
+              <select id="selectAsker" class="form-control" required></select>
+            </div>
+
+            <div class="form-group">
+              <label for="selectAnswerer">Quem respondeu/mostrou carta?</label>
+              <select id="selectAnswerer" class="form-control" required></select>
+            </div>
+
+            <div class="form-group">
+              <label>Cartas Solicitadas:</label>
+              <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <select id="selectAskedSuspect" class="form-control" required></select>
+                <select id="selectAskedWeapon" class="form-control" required></select>
+                <select id="selectAskedLocation" class="form-control" required></select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="selectCardShown">Qual carta ele te mostrou? (Opcional)</label>
+              <select id="selectCardShown" class="form-control">
+                <option value="">Não vi (apenas mostrou para outro jogador)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+              <span>📌</span> Registrar Palpite
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 3: Histórico de Palpites -->
+    <section id="tab-history" class="tab-content">
+      <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 class="panel-title" style="margin: 0; border: none; padding: 0;"><span>📜</span> Histórico de Jogadas</h3>
+          <button id="btnClearLog" class="btn btn-danger btn-sm">Limpar</button>
+        </div>
+        
+        <div id="logList" class="log-list">
+          <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 2rem;">
+            Nenhum palpite registrado nesta partida ainda.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div>Detetive Estrela &bull; Assistente de Investigação</div>
+    </footer>
+
+  </div>
+
+  <!-- MODAL SELETOR RÁPIDO PARA CELULAR -->
+  <div id="modalStatusPicker" class="modal-backdrop">
+    <div class="modal" style="max-width: 360px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="pickerCardTitle">Carta</h3>
+        <button class="close-btn" data-close="modalStatusPicker">&times;</button>
+      </div>
+      <p id="pickerSubtitle" style="font-size: 0.8rem; color: var(--text-muted);"></p>
+
+      <div class="mobile-status-picker">
+        <button class="picker-btn" data-val="0">
+          ?
+          <label>Desconhecido</label>
+        </button>
+        <button class="picker-btn" data-val="1">
+          ❌
+          <label>Não tem</label>
+        </button>
+        <button class="picker-btn" data-val="2">
+          ✔
+          <label>Tem</label>
+        </button>
+        <button class="picker-btn" data-val="3">
+          🔍
+          <label>Envelope</label>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 1: Seleção da Minha Mão Inicial -->
+  <div id="modalMyHand" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">🃏 Cartas Iniciais</h3>
+        <button class="close-btn" data-close="modalMyHand">&times;</button>
+      </div>
+      
+      <p style="font-size: 0.82rem; color: var(--text-muted);">
+        Selecione as cartas que você recebeu no início do jogo.
+      </p>
+
+      <div id="handSelectionList" class="hand-selection-grid">
+        <!-- Gerado dinamicamente -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+        <button class="btn btn-secondary" data-close="modalMyHand">Cancelar</button>
+        <button id="btnConfirmHand" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Nova Partida -->
+  <div id="modalNewGame" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙️ Nova Partida</h3>
+        <button class="close-btn" data-close="modalNewGame">&times;</button>
+      </div>
+
+      <form id="formNewGame">
+        <div class="form-group">
+          <label for="selectPreset">Edição do Jogo:</label>
+          <select id="selectPreset" class="form-control" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="inputPlayerCount">Jogadores na Mesa (2 a 6):</label>
+          <input type="number" id="inputPlayerCount" class="form-control" min="2" max="6" value="4" required>
+        </div>
+
+        <div class="form-group">
+          <label>Nomes dos Jogadores:</label>
+          <div id="playerNamesInputs" style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <!-- Gerado via JS -->
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+          <button type="button" class="btn btn-secondary" data-close="modalNewGame">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Iniciar Partida</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Main Script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
